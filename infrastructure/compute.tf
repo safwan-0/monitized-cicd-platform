@@ -74,3 +74,37 @@ resource "aws_instance" "runner" {
     Name = "${var.environment}-cicd-runner"
   }
 }
+resource "aws_instance" "runner" {
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = var.runner_instance_type
+  subnet_id              = aws_subnet.runner.id
+  vpc_security_group_ids = [aws_security_group.runner.id]
+  iam_instance_profile   = aws_iam_instance_profile.runner.name
+  monitoring             = true
+  ebs_optimized          = true
+
+  metadata_options {
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+    http_endpoint               = "enabled"
+  }
+
+  root_block_device {
+    volume_size           = 30
+    volume_type           = "gp3"
+    encrypted             = true
+    kms_key_id            = aws_kms_key.storage.arn
+    delete_on_termination = true
+  }
+
+  user_data = base64encode(templatefile("${path.module}/../runner-setup/install-runner.sh", {
+    github_org  = var.github_org
+    github_repo = var.github_repo
+    environment = var.environment
+    aws_region  = var.aws_region
+  }))
+
+  tags = {
+    Name = "${var.environment}-cicd-runner"
+  }
+}
