@@ -110,19 +110,15 @@ resource "aws_cloudtrail" "main" {
   cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
   cloud_watch_logs_role_arn     = aws_iam_role.cloudtrail.arn
   kms_key_id                    = aws_kms_key.storage.arn
+  sns_topic_name                = aws_sns_topic.deployments.arn
 
-  # specifically log S3 data events
-  # records every GetObject and PutObject on artifacts bucket
-  # know exactly who accessed what artifact when
   event_selector {
     read_write_type           = "All"
     include_management_events = true
 
     data_resource {
-      type = "AWS::S3::Object"
-      values = [
-        "${aws_s3_bucket.artifacts.arn}/"
-      ]
+      type   = "AWS::S3::Object"
+      values = ["${aws_s3_bucket.artifacts.arn}/"]
     }
   }
 
@@ -132,7 +128,6 @@ resource "aws_cloudtrail" "main" {
     Name = "${var.environment}-cicd-trail"
   }
 }
-
 # -----------------------------------------------------------
 # 2. CLOUDWATCH
 # Metrics, logs and alarms for the runner and pipeline
