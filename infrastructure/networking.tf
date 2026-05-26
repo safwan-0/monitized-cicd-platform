@@ -154,3 +154,73 @@ resource "aws_security_group" "endpoints" {
     Name = "${var.environment}-endpoints-sg"
   }
 }
+# default security group — restrict all traffic
+# Checkov requires default SG to deny everything
+resource "aws_default_security_group" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.environment}-default-sg-restricted"
+  }
+}
+
+# VPC Flow Logs — required by Checkov
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/${var.environment}/flow-logs"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.storage.arn
+
+  tags = {
+    Name = "${var.environment}-vpc-flow-logs"
+  }
+}
+
+resource "aws_iam_role" "vpc_flow_logs" {
+  name = "${var.environment}-vpc-flow-logs-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "vpc_flow_logs" {
+  name = "${var.environment}-vpc-flow-logs-policy"
+  role = aws_iam_role.vpc_flow_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "${aws_cloudwatch_log_group.vpc_flow_logs.arn}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_flow_log" "main" {
+  vpc_id          = aws_vpc.main.id
+  traffic_type    = "ALL"
+  iam_role_arn    = aws_iam_role.vpc_flow_logs.arn
+  log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
+
+  tags = {
+    Name = "${var.environment}-flow-log"
+  }
+}
