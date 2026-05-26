@@ -303,3 +303,44 @@ resource "aws_s3_bucket_logging" "artifacts" {
   target_bucket = aws_s3_bucket.logs.id
   target_prefix = "artifacts-access-logs/"
 }
+# SNS topic for S3 notifications
+resource "aws_sns_topic" "s3_notifications" {
+  name              = "${var.environment}-s3-notifications"
+  kms_master_key_id = aws_kms_key.storage.arn
+
+  tags = {
+    Name = "${var.environment}-s3-notifications"
+  }
+}
+
+resource "aws_sns_topic_policy" "s3_notifications" {
+  arn = aws_sns_topic.s3_notifications.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "s3.amazonaws.com" }
+        Action    = "SNS:Publish"
+        Resource  = aws_sns_topic.s3_notifications.arn
+        Condition = {
+          ArnLike = {
+            "aws:SourceArn" = aws_s3_bucket.artifacts.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_notification" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  topic {
+    topic_arn = aws_sns_topic.s3_notifications.arn
+    events    = ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"]
+  }
+
+  depends_on = [aws_sns_topic_policy.s3_notifications]
+}
