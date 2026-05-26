@@ -16,10 +16,10 @@
 # -----------------------------------------------------------
 
 # CloudWatch log group for CloudTrail
-# keeps logs searchable for 90 days
+# update cloudtrail log group retention to 365
 resource "aws_cloudwatch_log_group" "cloudtrail" {
   name              = "/aws/cloudtrail/${var.environment}-cicd"
-  retention_in_days = 90
+  retention_in_days = 365
   kms_key_id        = aws_kms_key.storage.arn
 
   tags = {
@@ -27,27 +27,17 @@ resource "aws_cloudwatch_log_group" "cloudtrail" {
   }
 }
 
-# IAM role that allows CloudTrail to write to CloudWatch
-resource "aws_iam_role" "cloudtrail" {
-  name = "${var.environment}-cloudtrail-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudtrail.amazonaws.com"
-        }
-        Action = "sts:AssumeRole"
-      }
-    ]
-  })
+# update runner log group retention to 365
+resource "aws_cloudwatch_log_group" "runner" {
+  name              = "/cicd/${var.environment}/runner"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.storage.arn
 
   tags = {
-    Name = "${var.environment}-cloudtrail-role"
+    Name = "${var.environment}-runner-logs"
   }
 }
+
 
 resource "aws_iam_role_policy" "cloudtrail" {
   name = "${var.environment}-cloudtrail-policy"
